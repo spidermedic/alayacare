@@ -41,29 +41,38 @@ def download_schedule(start_date, end_date):
     except:
         sys.exit("\nUnable to get data from website\n")
 
+def get_city(patientID):
+
+    URL = f"https://nelc.alayacare.com/api/v1/patients/{patientID}"
+    r = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
+    info = json.loads(r.text)
+    return info["city"]
+
 
 def make_new_schedule(downloaded_schedule):
-    # creates a 4 day schedule with date keys  so that days with no visit are included.
+    # creates a 5 day schedule with date keys  so that days with no visit are included.
     new_schedule = {}
-    n = datetime.now()
+    now = datetime.now()
 
     # create the dictionary keys using the date
-    new_schedule[n.strftime("%b %d")] = []
-    for i in range(3):
-        n += timedelta(days=1)
-        new_schedule[n.strftime("%b %d")] = []
+    new_schedule[now.strftime("%b %d")] = []
+
+    for i in range(4):
+        now += timedelta(days=1)
+        new_schedule[now.strftime("%b %d")] = []
 
     # add the downloaded visits to the new schedule
     for item in downloaded_schedule:
         this_visit = datetime.fromisoformat(item["start"])
-        if item.get("patient") and not item["is_cancelled"]:
+        if item.get("patient") and not item["is_cancelled"]:         
             patient = item["patient"]["name"].split(" ")[-1] # Extracts last name
             patientID = item["patient"]["id"]
+            patientCity = get_city(patientID)
             service = item["service"]["name"].split("-")[-1] # Removes the RN- portion
             if service == "":
                 service = item["service"]["name"].split("-")[-2] # This is if the service ends with a dash
             date = this_visit.strftime("%b %d")
-            visit = [this_visit.strftime("%H:%M"), patientID, patient, service]
+            visit = [this_visit.strftime("%H:%M"), patientID, patientCity, patient, service]
             new_schedule[date].append(visit)
 
 
@@ -75,7 +84,7 @@ def make_new_schedule(downloaded_schedule):
             print("  No Visits Scheduled")
         else:
             for i in new_schedule[item]:
-                print(f"  {i[0]}  {i[1]:6} {i[2]:15}  {i[3]}")
+                print(f"  {i[0]}  {i[1]:6} {i[2]:15}  {i[3]:15} {i[4]}")
         print()
 
     return new_schedule
