@@ -1,5 +1,7 @@
-# This program checks alayacare for schedule changes and
-# sends a text messages when changes are detected.
+"""
+This program checks alayacare for schedule changes and
+sends a text messages when changes are detected.
+"""
 
 import sys
 import json
@@ -125,7 +127,6 @@ def main():
                 if visit not in new_schedule[visitDate]:
                     message += f" (-) {visit[3]}, {visit[2]}\n"
                     changes += 1
-
 
     # Send an email if changes are found
     if changes > 0:
