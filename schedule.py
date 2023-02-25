@@ -115,18 +115,22 @@ def main():
     message = ""
 
     for visitDate  in new_schedule:
-        if new_schedule[visitDate] != saved_schedule[visitDate]:
-            message += f"\n{visitDate}:\n"
 
-            for visit in new_schedule[visitDate]:
-                if visit not in saved_schedule[visitDate]:
-                    message += f" (+) {visit[3]}, {visit[2]}\n"
-                    changes += 1
+        try:
+            if new_schedule[visitDate] != saved_schedule[visitDate]:
+                message += f"\n{visitDate}:\n"
 
-            for visit in saved_schedule[visitDate]:
-                if visit not in new_schedule[visitDate]:
-                    message += f" (-) {visit[3]}, {visit[2]}\n"
-                    changes += 1
+                for visit in new_schedule[visitDate]:
+                    if visit not in saved_schedule[visitDate]:
+                        message += f" (+) {visit[3]}, {visit[2]}\n"
+                        changes += 1
+
+                for visit in saved_schedule[visitDate]:
+                    if visit not in new_schedule[visitDate]:
+                        message += f" (-) {visit[3]}, {visit[2]}\n"
+                        changes += 1
+        except:
+            pass
 
     # Send an email if changes are found
     if changes > 0:
