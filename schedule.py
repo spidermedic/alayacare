@@ -11,7 +11,7 @@ from   datetime import datetime, timedelta
 
 
 def sendmail(message):
-
+    """Sends an email notification regarding changes to the schedule"""
     # create message object instance
     msg = MIMEText(message)
 
@@ -21,16 +21,15 @@ def sendmail(message):
     msg["To"]   = credentials.MAIL_RECIPIENT
     msg["Subject"] = None
 
-
-    # start server and send message
+    # start the server and send a message
     with smtplib.SMTP(host=credentials.SMTP_HOST, port=credentials.SMTP_PORT) as server:
         server.login(msg["From"], password)
         server.sendmail(msg["From"], msg["To"], msg.as_string())
         print("Message sent.\n")
 
 
-# Query Alayacare and get visits for the number of days specified in main() 
 def download_schedule(start_date, end_date):
+    """Gets visits for the number of days specified in main()"""
 
     # Query AlayaCare website for json data
     URL = f"https://{credentials.COMPANY}.alayacare.com/scheduling/admin/getshifts?start={start_date}&end={end_date}&calendar_type=user&employees={credentials.ID}"
@@ -39,40 +38,43 @@ def download_schedule(start_date, end_date):
         r = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
         return json.loads(r.text)
     except:
-        sys.exit("\nUnable to get data from website\n")
+        sys.exit("\nUnable download visit data.\n")
+
 
 def get_city(patientID):
+    """Gets the patient's city from a patient api"""
 
     URL = f"https://nelc.alayacare.com/api/v1/patients/{patientID}"
-    r = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
-    info = json.loads(r.text)
-    return info["city"]
+    try:
+        r = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
+        return json.loads(r.text)["city"]
+    except:
+        sys.exit("\nUnable download city data.\n")       
 
 
 def make_new_schedule(downloaded_schedule):
-    # creates a 5 day schedule with date keys  so that days with no visit are included.
+    """Creates a 5 day schedule with date keys so that days with no visit are included."""
+
     new_schedule = {}
     now = datetime.now()
 
-    # create the dictionary keys using the date
+    # Initialize the dictionary using the dates for the keys
     new_schedule[now.strftime("%b %d")] = []
-
     for i in range(4):
         now += timedelta(days=1)
         new_schedule[now.strftime("%b %d")] = []
 
     # add the downloaded visits to the new schedule
     for item in downloaded_schedule:
-        this_visit = datetime.fromisoformat(item["start"])
+        #this_visit = datetime.fromisoformat(item["start"])
         if item.get("patient") and not item["is_cancelled"]:         
-            patient = item["patient"]["name"].split(" ")[-1] # Extracts last name
             patientID = item["patient"]["id"]
             patientCity = get_city(patientID)
             service = item["service"]["name"].split("-")[-1] # Removes the RN- portion
             if service == "":
-                service = item["service"]["name"].split("-")[-2] # This is if the service ends with a dash
-            date = this_visit.strftime("%b %d")
-            visit = [this_visit.strftime("%H:%M"), patientID, patientCity, patient, service]
+                service = item["service"]["name"].split("-")[-2].strip() # This is if the service ends with a dash
+            date = datetime.fromisoformat(item["start"]).strftime("%b %d")
+            visit = [datetime.fromisoformat(item["start"]).strftime("%H:%M"), patientID, patientCity, service]
             new_schedule[date].append(visit)
 
 
@@ -84,7 +86,7 @@ def make_new_schedule(downloaded_schedule):
             print("  No Visits Scheduled")
         else:
             for i in new_schedule[item]:
-                print(f"  {i[0]}  {i[1]:6} {i[2]:15}  {i[3]:15} {i[4]}")
+                print(f"  {i[0]}  {i[1]:6} {i[2]:15} {i[3]}")
         print()
 
     return new_schedule
