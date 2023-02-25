@@ -12,16 +12,16 @@ from   datetime import datetime, timedelta
 
 def sendmail(message):
     """Sends an email notification regarding changes to the schedule"""
-    # create message object instance
+    # Create message object instance
     msg = MIMEText(message)
 
-    # set message parameters
+    # Set message parameters
     password    = credentials.MAIL_PASSWORD
     msg["From"] = credentials.MAIL_SENDER
     msg["To"]   = credentials.MAIL_RECIPIENT
     msg["Subject"] = None
 
-    # start the server and send a message
+    # Start the server and send a message
     with smtplib.SMTP(host=credentials.SMTP_HOST, port=credentials.SMTP_PORT) as server:
         server.login(msg["From"], password)
         server.sendmail(msg["From"], msg["To"], msg.as_string())
@@ -64,21 +64,21 @@ def make_new_schedule(downloaded_schedule):
         now += timedelta(days=1)
         new_schedule[now.strftime("%b %d")] = []
 
-    # add the downloaded visits to the new schedule
+    # Add the downloaded visits to the new schedule
     for item in downloaded_schedule:
-        #this_visit = datetime.fromisoformat(item["start"])
         if item.get("patient") and not item["is_cancelled"]:         
             patientID = item["patient"]["id"]
             patientCity = get_city(patientID)
+            # Clean up the service description
             service = item["service"]["name"].split("-")[-1] # Removes the RN- portion
             if service == "":
                 service = item["service"]["name"].split("-")[-2].strip() # This is if the service ends with a dash
+            service = service.replace("Visit", "") # Removes "Visit" from the string
             date = datetime.fromisoformat(item["start"]).strftime("%b %d")
             visit = [datetime.fromisoformat(item["start"]).strftime("%H:%M"), patientID, patientCity, service]
             new_schedule[date].append(visit)
 
-
-    # print the schedule to the console
+    # Print the schedule to the console
     print()
     for item in new_schedule:
         print(item)
@@ -100,7 +100,7 @@ def main():
     downloaded_schedule = download_schedule(today, end_date)
     new_schedule = make_new_schedule(downloaded_schedule)
 
-    # open the previous schedule or create it if it doesn't exist
+    # Open the previous schedule or create it if it doesn't exist
     try:
         with open("saved-schedule.json", "r") as f:
             saved_schedule = json.load(f)
@@ -108,31 +108,32 @@ def main():
         with open("saved-schedule.json", "w") as f:
             f.write(json.dumps(new_schedule, indent=4))
 
-    # if the file exists, compare the schedules
+    # If the file exists, compare the two schedules
     changes = 0
     message = ""
 
-    for item in new_schedule:
-        try:
-            total_visits = len(new_schedule[item]) - len(saved_schedule[item])
+    for visitDate  in new_schedule:
+        if new_schedule[visitDate] != saved_schedule[visitDate]:
+            message += f"\n{visitDate}:\n"
 
-            if total_visits > 0:
-                message += f" {item} - Visit added\n"
-                changes += 1
-            elif total_visits < 0:
-                message += f" {item} - Visit removed\n"
-                changes += 1
-            else:
-                pass
-        except:
-            pass
+            for visit in new_schedule[visitDate]:
+                if visit not in saved_schedule[visitDate]:
+                    message += f" (+) {visit[3]}, {visit[2]}\n"
+                    changes += 1
 
+            for visit in saved_schedule[visitDate]:
+                if visit not in new_schedule[visitDate]:
+                    message += f" (-) {visit[3]}, {visit[2]}\n"
+                    changes += 1
+
+
+    # Send an email if changes are found
     if changes > 0:
-
         print(f"\nFound {changes} changes in the schedule. ", end="")
+        message += f"\n_"
         sendmail(message)
 
-        # save the new schedule
+    # Save the new schedule
     with open("saved-schedule.json", "w") as f:
         f.write(json.dumps(new_schedule, indent=4))
 
