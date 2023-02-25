@@ -14,6 +14,7 @@ from   datetime import datetime, timedelta
 
 def sendmail(message):
     """Sends an email notification regarding changes to the schedule"""
+    
     # Create message object instance
     msg = MIMEText(message)
 
@@ -33,25 +34,27 @@ def sendmail(message):
 def download_schedule(start_date, end_date):
     """Gets visits for the number of days specified in main()"""
 
-    # Query AlayaCare website for json data
+    # Query AlayaCare for schedule data
     URL = f"https://{credentials.COMPANY}.alayacare.com/scheduling/admin/getshifts?start={start_date}&end={end_date}&calendar_type=user&employees={credentials.ID}"
 
     try:
         r = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
-        return json.loads(r.text)
+        return r.json()
     except:
         sys.exit("\nUnable download visit data.\n")
 
 
 def get_city(patientID):
-    """Gets the patient's city from a patient api"""
+    """Gets the patient's city from a patient API"""
 
+    # Query AlayaCare for patient information
     URL = f"https://nelc.alayacare.com/api/v1/patients/{patientID}"
+    
     try:
-        r = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
-        return json.loads(r.text)["city"]
-    except:
-        sys.exit("\nUnable download city data.\n")       
+        response = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
+        return response.json()["city"]
+    except (requests.exceptions.RequestException, KeyError):
+        sys.exit("\nUnable to download city data.\n")     
 
 
 def make_new_schedule(downloaded_schedule, days):
