@@ -54,31 +54,22 @@ def get_city(patientID):
         sys.exit("\nUnable download city data.\n")       
 
 
-def make_new_schedule(downloaded_schedule):
-    """Creates a 5 day schedule with date keys so that days with no visit are included."""
+def make_new_schedule(downloaded_schedule, days):
+    """Creates a multi-day schedule - days is specified in main() - with date keys so that days with no visit are included."""
 
     new_schedule = {}
-    now = datetime.now()
+    start_date = datetime.now()
 
-    # Initialize the dictionary using the dates for the keys
-    new_schedule[now.strftime("%b %d")] = []
-    for i in range(4):
-        now += timedelta(days=1)
-        new_schedule[now.strftime("%b %d")] = []
+    for i in range(days):
+        date_str = start_date.strftime("%b %d")
+        new_schedule.setdefault(date_str, [])
+        start_date += timedelta(days=1)
 
-    # Add the downloaded visits to the new schedule
     for item in downloaded_schedule:
-        if item.get("patient") and not item["is_cancelled"]:         
-            patientID = item["patient"]["id"]
-            patientCity = get_city(patientID)
-            # Clean up the service description
-            service = item["service"]["name"].split("-")[-1] # Removes the RN- portion
-            if service == "":
-                service = item["service"]["name"].split("-")[-2].strip() # This is if the service ends with a dash
-            service = service.replace("Visit", "") # Removes "Visit" from the string
+        if item.get("patient") and not item["is_cancelled"]:
+            visit = create_visit_from_item(item)
             date = datetime.fromisoformat(item["start"]).strftime("%b %d")
-            visit = [datetime.fromisoformat(item["start"]).strftime("%H:%M"), patientID, patientCity, service]
-            new_schedule[date].append(visit)
+            new_schedule.setdefault(date, []).append(visit)
 
     # Print the schedule to the console
     print()
@@ -94,13 +85,31 @@ def make_new_schedule(downloaded_schedule):
     return new_schedule
 
 
-def main():
+def create_visit_from_item(item):
+    """Creates a visit from an item in the downloaded schedule."""
 
+    patient_id = item["patient"]["id"]
+    patient_city = get_city(patient_id)
+
+    # Clean up the service description
+    service = item["service"]["name"].split("-")[-1].strip(" ") # Removes the RN- portion
+    if service == "":
+        service = item["service"]["name"].split("-")[-2].strip(" ") # This is if the service ends with a dash
+    service = service.replace("Visit", "") # Removes "Visit" from the string
+
+    start_time = datetime.fromisoformat(item["start"]).strftime("%H:%M")
+
+    return [start_time, patient_id, patient_city, service]
+
+
+def main():
+    
+    days = 5
     today = datetime.now().date()
-    end_date = today + timedelta(days=4)
+    end_date = today + timedelta(days)
 
     downloaded_schedule = download_schedule(today, end_date)
-    new_schedule = make_new_schedule(downloaded_schedule)
+    new_schedule = make_new_schedule(downloaded_schedule, days)
 
     # Open the previous schedule or create it if it doesn't exist
     try:
@@ -132,28 +141,9 @@ def main():
         except KeyError:
             pass
 
-
-    # for visitDate  in new_schedule:
-    #     try:
-    #         if new_schedule[visitDate] != saved_schedule[visitDate]:
-    #             message += f"\n{visitDate}:\n"
-
-    #             for visit in new_schedule[visitDate]:
-    #                 if visit not in saved_schedule[visitDate]:
-    #                     message += f" (+) {visit[3]}, {visit[2]}\n"
-    #                     changes += 1
-
-    #             for visit in saved_schedule[visitDate]:
-    #                 if visit not in new_schedule[visitDate]:
-    #                     message += f" (-) {visit[3]}, {visit[2]}\n"
-    #                     changes += 1
-    #     except:
-    #         pass
-
     # Send an email if changes are found
     if changes > 0:
         print(f"\nFound {changes} changes in the schedule. ", end="")
-        message += f"\n_"
         sendmail(message)
 
     # Save the new schedule
