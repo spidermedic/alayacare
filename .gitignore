@@ -1,3 +1,5 @@
 *.json
 *.ipynb
 credentials.py
+alayacare.py
+testfile.py

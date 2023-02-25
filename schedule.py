@@ -1,12 +1,13 @@
-#!/usr/bin/env python
+# This program checks alayacare for schedule changes and
+# sends a text messages when changes are detected.
 
 import sys
 import json
 import smtplib
 import requests
 import credentials
-from email.mime.text import MIMEText
-from datetime import datetime, timedelta
+from   email.mime.text import MIMEText
+from   datetime import datetime, timedelta
 
 
 def sendmail(message):
@@ -15,11 +16,11 @@ def sendmail(message):
     msg = MIMEText(message)
 
     # set message parameters
-    password = credentials.PASSWORD
-    msg["From"] = credentials.SENDER
+    password    = credentials.MAIL_PASSWORD
+    msg["From"] = credentials.MAIL_SENDER
+    msg["To"]   = credentials.MAIL_RECIPIENT
     msg["Subject"] = None
 
-    msg["To"] = credentials.RECIPIENT
 
     # start server and send message
     with smtplib.SMTP(host=credentials.SMTP_HOST, port=credentials.SMTP_PORT) as server:
@@ -28,7 +29,8 @@ def sendmail(message):
         print("Message sent.\n")
 
 
-def get_schedule(start_date, end_date):
+# Query Alayacare and get visits for the number of days specified in main() 
+def download_schedule(start_date, end_date):
 
     # Query AlayaCare website for json data
     URL = f"https://{credentials.COMPANY}.alayacare.com/scheduling/admin/getshifts?start={start_date}&end={end_date}&calendar_type=user&employees={credentials.ID}"
@@ -55,11 +57,15 @@ def make_new_schedule(downloaded_schedule):
     for item in downloaded_schedule:
         this_visit = datetime.fromisoformat(item["start"])
         if item.get("patient") and not item["is_cancelled"]:
-            patient = item["patient"]["name"]
-            service = item["service"]["name"].split("-")[-1]
+            patient = item["patient"]["name"].split(" ")[-1] # Extracts last name
+            patientID = item["patient"]["id"]
+            service = item["service"]["name"].split("-")[-1] # Removes the RN- portion
+            if service == "":
+                service = item["service"]["name"].split("-")[-2] # This is if the service ends with a dash
             date = this_visit.strftime("%b %d")
-            visit = [this_visit.strftime("%H:%M"), patient, service]
+            visit = [this_visit.strftime("%H:%M"), patientID, patient, service]
             new_schedule[date].append(visit)
+
 
     # print the schedule to the console
     print()
@@ -69,7 +75,7 @@ def make_new_schedule(downloaded_schedule):
             print("  No Visits Scheduled")
         else:
             for i in new_schedule[item]:
-                print(f"  {i[0]}  {i[1]:22}  {i[2]}")
+                print(f"  {i[0]}  {i[1]:6} {i[2]:15}  {i[3]}")
         print()
 
     return new_schedule
@@ -80,26 +86,24 @@ def main():
     today = datetime.now().date()
     end_date = today + timedelta(days=4)
 
-    downloaded_schedule = get_schedule(today, end_date)
+    downloaded_schedule = download_schedule(today, end_date)
     new_schedule = make_new_schedule(downloaded_schedule)
 
     # open the previous schedule or create it if it doesn't exist
     try:
-        with open("schedule.json", "r") as f:
-            previous_schedule = json.load(f)
+        with open("saved-schedule.json", "r") as f:
+            saved_schedule = json.load(f)
     except:
-        with open("schedule.json", "w") as f:
+        with open("saved-schedule.json", "w") as f:
             f.write(json.dumps(new_schedule, indent=4))
 
     # if the file exists, compare the schedules
     changes = 0
-    # message = f"{datetime.now().strftime('%m/%d/%Y %H:%M')}\nSchedule updated: \n"
     message = ""
 
     for item in new_schedule:
-
         try:
-            total_visits = len(new_schedule[item]) - len(previous_schedule[item])
+            total_visits = len(new_schedule[item]) - len(saved_schedule[item])
 
             if total_visits > 0:
                 message += f" {item} - Visit added\n"
@@ -118,7 +122,7 @@ def main():
         sendmail(message)
 
         # save the new schedule
-    with open("schedule.json", "w") as f:
+    with open("saved-schedule.json", "w") as f:
         f.write(json.dumps(new_schedule, indent=4))
 
 
