@@ -39,8 +39,8 @@ def download_schedule(start_date, end_date):
     URL = f"https://{credentials.COMPANY}.alayacare.com/scheduling/admin/getshifts?start={start_date}&end={end_date}&calendar_type=user&employees={credentials.ID}"
 
     try:
-        r = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
-        return r.json()
+        response = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
+        return response.json()
     except:
         sys.exit("\nUnable download visit data.\n")
 
