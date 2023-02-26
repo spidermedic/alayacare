@@ -1,3 +1,5 @@
+# Fill in the info and rename to credentials.py
+
 # Alayacare Account Info
 USERNAME = "email address"
 PASSWORD = "your password"
