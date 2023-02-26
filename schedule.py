@@ -6,6 +6,7 @@ sends a text messages when changes are detected.
 import os
 import sys
 import json
+import logging
 import smtplib
 import requests
 import credentials
@@ -29,7 +30,7 @@ def sendmail(message):
     with smtplib.SMTP(host=credentials.SMTP_HOST, port=credentials.SMTP_PORT) as server:
         server.login(msg["From"], password)
         server.sendmail(msg["From"], msg["To"], msg.as_string())
-        print("Message sent.\n")
+        logging.info("Message sent.")
 
 
 def download_schedule(start_date, end_date):
@@ -40,9 +41,11 @@ def download_schedule(start_date, end_date):
 
     try:
         response = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
+        response.raise_for_status()
         return response.json()
-    except:
-        sys.exit("\nUnable download visit data.\n")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Unable to download visit data: {e}")
+        sys.exit()
 
 
 def get_city(patientID):
@@ -53,9 +56,11 @@ def get_city(patientID):
     
     try:
         response = requests.get(URL, auth=(credentials.USERNAME, credentials.PASSWORD))
+        response.raise_for_status()
         return response.json()["city"]
-    except (requests.exceptions.RequestException, KeyError):
-        sys.exit("\nUnable to download city data.\n")     
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Unable to download visit data: {e}")
+        sys.exit()   
 
 
 def make_new_schedule(downloaded_schedule, days):
