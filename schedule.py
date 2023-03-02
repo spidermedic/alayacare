@@ -9,6 +9,7 @@ import json
 import logging
 import smtplib
 import requests
+import subprocess
 import credentials
 from   email.mime.text import MIMEText
 from   datetime import datetime, timedelta
@@ -112,58 +113,61 @@ def create_visit_from_item(item):
 
 
 def main():
+
+    try: # is is in place to catch any error codes
     
-    # Set the number of day to parse
-    days = 5
+        # Set the number of day to parse
+        days = 5
 
-    # Set the start and end dates
-    today = datetime.now().date()
-    end_date = today + timedelta(days)
+        # Set the start and end dates
+        today = datetime.now().date()
+        end_date = today + timedelta(days)
 
-    # Download a schedule for the specified dates
-    downloaded_schedule = download_schedule(today, end_date)
+        # Download a schedule for the specified dates
+        downloaded_schedule = download_schedule(today, end_date)
 
-    # Create a schedule for the specified number of days, including days with no visits
-    new_schedule = make_new_schedule(downloaded_schedule, days)
+        # Create a schedule for the specified number of days, including days with no visits
+        new_schedule = make_new_schedule(downloaded_schedule, days)
 
-    # Open the previous schedule or create it if it doesn't exist
-    if os.path.exists("saved-schedule.json"):
-        with open("saved-schedule.json", "r") as f:
-            saved_schedule = json.load(f)
-    else:
-        saved_schedule = new_schedule
+        # Open the previous schedule or create it if it doesn't exist
+        if os.path.exists("saved-schedule.json"):
+            with open("saved-schedule.json", "r") as f:
+                saved_schedule = json.load(f)
+        else:
+            saved_schedule = new_schedule
 
-    # If the file exists, compare the two schedules
-    changes = 0
-    message = ""
+        # If the file exists, compare the two schedules
+        changes = 0
+        message = ""
 
-    for visitDate, new_visits in new_schedule.items():
-        try:
-            saved_visits = saved_schedule[visitDate]
-            if new_visits != saved_visits:
-                message += f"\n{visitDate}:\n"
+        for visitDate, new_visits in new_schedule.items():
+            if visitDate in saved_schedule:
+                    saved_visits = saved_schedule[visitDate]
+                    if new_visits != saved_visits:
+                        message += f"\n{visitDate}:\n"
 
-                for new_visit in new_visits:
-                    if new_visit not in saved_visits:
-                        message += f" (+) {new_visit[3]}, {new_visit[2]}\n"
-                        changes += 1
+                        for new_visit in new_visits:
+                            if new_visit not in saved_visits:
+                                message += f" (+) {new_visit[3]}, {new_visit[2]}\n"
+                                changes += 1
 
-                for saved_visit in saved_visits:
-                    if saved_visit not in new_visits:
-                        message += f" (-) {saved_visit[3]}, {saved_visit[2]}\n"
-                        changes += 1
-        except:
-            pass
+                        for saved_visit in saved_visits:
+                            if saved_visit not in new_visits:
+                                message += f" (-) {saved_visit[3]}, {saved_visit[2]}\n"
+                                changes += 1
 
+        # Send an email if changes are found
+        if changes > 0:
+            print(f"\nFound {changes} changes in the schedule. ", end="")
+            sendmail(message)
 
-    # Send an email if changes are found
-    if changes > 0:
-        print(f"\nFound {changes} changes in the schedule. ", end="")
-        sendmail(message)
+        # Save the new schedule
+        with open("saved-schedule.json", "w") as f:
+            json.dump(new_schedule, f, indent=4)
 
-    # Save the new schedule
-    with open("saved-schedule.json", "w") as f:
-        json.dump(new_schedule, f, indent=4)
+    except subprocess.CalledProcessError as e:
+        print(f"{sys.argv[0]} exited with error code {e.returncode}")
+        sendmail(f"{sys.argv[0]} exited with error code {e.returncode}")
 
 
 if __name__ == "__main__":
