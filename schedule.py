@@ -138,19 +138,22 @@ def main():
     message = ""
 
     for visitDate, new_visits in new_schedule.items():
-        saved_visits = saved_schedule[visitDate]
-        if new_visits != saved_visits:
-            message += f"\n{visitDate}:\n"
+        try:
+            saved_visits = saved_schedule[visitDate]
+            if new_visits != saved_visits:
+                message += f"\n{visitDate}:\n"
 
-            for new_visit in new_visits:
-                if new_visit not in saved_visits:
-                    message += f" (+) {new_visit[3]}, {new_visit[2]}\n"
-                    changes += 1
+                for new_visit in new_visits:
+                    if new_visit not in saved_visits:
+                        message += f" (+) {new_visit[3]}, {new_visit[2]}\n"
+                        changes += 1
 
-            for saved_visit in saved_visits:
-                if saved_visit not in new_visits:
-                    message += f" (-) {saved_visit[3]}, {saved_visit[2]}\n"
-                    changes += 1
+                for saved_visit in saved_visits:
+                    if saved_visit not in new_visits:
+                        message += f" (-) {saved_visit[3]}, {saved_visit[2]}\n"
+                        changes += 1
+        except:
+            pass
 
 
     # Send an email if changes are found
